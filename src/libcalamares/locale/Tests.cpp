@@ -107,7 +107,11 @@ LocaleTests::testLanguageScripts()
 
         QVERIFY( locale.language() == QLocale::Greek ? locale.script() == QLocale::GreekScript : true );
         QVERIFY( locale.language() == QLocale::Korean ? locale.script() == QLocale::KoreanScript : true );
+#if QT_VERSION < QT_VERSION_CHECK( 6, 6, 0 )
         QVERIFY( locale.language() == QLocale::Lithuanian ? locale.country() == QLocale::Lithuania : true );
+#else
+        QVERIFY( locale.language() == QLocale::Lithuanian ? locale.territory() == QLocale::Lithuania : true );
+#endif
         QVERIFY( locale.language() != QLocale::C );
     }
 }
@@ -122,9 +126,15 @@ LocaleTests::testEsperanto()
 void
 LocaleTests::testInterlingue()
 {
+#if CALAMARES_QT_SUPPORT_INTERLINGUE
+    // ie was fixed in version ... of Qt
+    QCOMPARE( QLocale( "ie" ).language(), QLocale::Interlingue );
+    QCOMPARE( QLocale( QLocale::Interlingue ).language(), QLocale::Interlingue );
+#else
     // ie / Interlingue is borked (is "ie" even the right name?)
     QCOMPARE( QLocale( "ie" ).language(), QLocale::C );
     QCOMPARE( QLocale( QLocale::Interlingue ).language(), QLocale::English );
+#endif
 
     // "ia" exists (post-war variant of Interlingue)
     QCOMPARE( QLocale( "ia" ).language(), QLocale::Interlingua );

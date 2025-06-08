@@ -22,6 +22,7 @@
 #include "GlobalStorage.h"
 #include "JobQueue.h"
 #include "Settings.h"
+#include "compat/CheckBox.h"
 #include "utils/Gui.h"
 #include "utils/Logger.h"
 #include "utils/Retranslator.h"
@@ -135,11 +136,13 @@ UsersPage::UsersPage( Config* config, QWidget* parent )
     connect( config, &Config::loginNameChanged, ui->textBoxLoginName, &QLineEdit::setText );
     connect( config, &Config::loginNameStatusChanged, this, &UsersPage::reportLoginNameStatus );
 
+    ui->checkBoxDoAutoLogin->setVisible( m_config->displayAutoLogin() );
     ui->checkBoxDoAutoLogin->setChecked( m_config->doAutoLogin() );
     connect( ui->checkBoxDoAutoLogin,
-             &QCheckBox::stateChanged,
+             Calamares::checkBoxStateChangedSignal,
              this,
-             [ this ]( int checked ) { m_config->setAutoLogin( checked != Qt::Unchecked ); } );
+             [ this ]( Calamares::checkBoxStateType checked )
+             { m_config->setAutoLogin( checked != Calamares::checkBoxUncheckedValue ); } );
     connect( config, &Config::autoLoginChanged, ui->checkBoxDoAutoLogin, &QCheckBox::setChecked );
 
     ui->checkBoxReusePassword->setVisible( m_config->writeRootPassword() );
@@ -147,7 +150,7 @@ UsersPage::UsersPage( Config* config, QWidget* parent )
     if ( m_config->writeRootPassword() )
     {
         connect( config, &Config::reuseUserPasswordForRootChanged, ui->checkBoxReusePassword, &QCheckBox::setChecked );
-        connect( ui->checkBoxReusePassword, &QCheckBox::stateChanged, this, &UsersPage::onReuseUserPasswordChanged );
+        connect( ui->checkBoxReusePassword, Calamares::checkBoxStateChangedSignal, this, &UsersPage::onReuseUserPasswordChanged );
     }
 
     ui->checkBoxRequireStrongPassword->setVisible( m_config->permitWeakPasswords() );
@@ -155,7 +158,7 @@ UsersPage::UsersPage( Config* config, QWidget* parent )
     if ( m_config->permitWeakPasswords() )
     {
         connect( ui->checkBoxRequireStrongPassword,
-                 &QCheckBox::stateChanged,
+                 Calamares::checkBoxStateChangedSignal,
                  this,
                  [ this ]( int checked ) { m_config->setRequireStrongPasswords( checked != Qt::Unchecked ); } );
         connect(

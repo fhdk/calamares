@@ -216,6 +216,8 @@ public:
     /// Write /etc/hosts ?
     bool writeEtcHosts() const { return m_writeEtcHosts; }
 
+    /// Should the user be able to changed the value of autologin?
+    bool displayAutoLogin() const { return m_displayAutoLogin; }
     /// Should the user be automatically logged-in?
     bool doAutoLogin() const { return m_doAutoLogin; }
     /// Should the root password be written (if false, no password is set and the root account is disabled for login)
@@ -258,6 +260,9 @@ public:
 
     const QStringList& forbiddenLoginNames() const;
     const QStringList& forbiddenHostNames() const;
+
+    int homePermissions() const { return m_homeDirPermissions; }
+    int homeUMask() const { return m_homeDirPermissions >= 0 ? ( ( ~m_homeDirPermissions ) & 0777 ) : -1; }
 
 public Q_SLOTS:
     /** @brief Sets the user's shell if possible
@@ -340,6 +345,7 @@ private:
     QString m_rootPassword;
     QString m_rootPasswordSecondary;
 
+    bool m_displayAutoLogin = false;
     bool m_doAutoLogin = false;
 
     bool m_writeRootPassword = true;
@@ -368,6 +374,8 @@ private:
     QStringList m_forbiddenLoginNames;
 
     PasswordCheckList m_passwordChecks;
+
+    int m_homeDirPermissions = -1;
 };
 
 #endif

@@ -89,6 +89,11 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
     Calamares::GlobalStorage* gs = Calamares::JobQueue::instance()->globalStorage();
 
     const bool isEfi = PartUtils::isEfiSystem();
+    
+    bool createHybridBootloaderLayout = false;
+    if ( gs->contains( "createHybridBootloaderLayout" ) ) {
+        createHybridBootloaderLayout = gs->value( "createHybridBootloaderLayout" ).toBool();
+    }
 
     // Partition sizes are expressed in MiB, should be multiples of
     // the logical sector size (usually 512B). EFI starts with 2MiB
@@ -105,8 +110,10 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
     PartitionTable::TableType partType = PartitionTable::nameToTableType( o.defaultPartitionTableType );
     if ( partType == PartitionTable::unknownTableType )
     {
-        partType = isEfi ? PartitionTable::gpt : PartitionTable::msdos;
+        partType = ( isEfi || createHybridBootloaderLayout ) ? PartitionTable::gpt : PartitionTable::msdos;
     }
+    // last usable sector possibly allowing for secondary GPT using 66 sectors (256 entries)
+    const qint64 lastUsableSector = dev->totalLogical() - ( partType == PartitionTable::gpt ? 67 : 1 );
 
     // Looking up the defaultFsType (which should name a filesystem type)
     // will log an error and set the type to Unknown if there's something wrong.
@@ -116,7 +123,7 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
 
     core->createPartitionTable( dev, partType );
 
-    if ( isEfi )
+    if ( createHybridBootloaderLayout || isEfi )
     {
         qint64 uefisys_part_sizeB = PartUtils::efiFilesystemRecommendedSize();
         qint64 efiSectorCount = Calamares::bytesToSectors( uefisys_part_sizeB, dev->logicalSize() );
@@ -142,6 +149,25 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
         }
         core->createPartition( dev, efiPartition, KPM_PARTITION_FLAG_ESP );
         firstFreeSector = lastSector + 1;
+
+        if ( createHybridBootloaderLayout )
+        {
+            qint64 bios_part_sizeB = 8_MiB;
+            qint64 biosSectorCount = Calamares::bytesToSectors( bios_part_sizeB, dev->logicalSize() );
+            Q_ASSERT( biosSectorCount > 0 );
+
+            qint64 lastSector = firstFreeSector + biosSectorCount - 1;
+            Partition* biosPartition = KPMHelpers::createNewPartition( dev->partitionTable(),
+                                                                       *dev,
+                                                                       PartitionRole( PartitionRole::Primary ),
+                                                                       FileSystem::Unformatted,
+                                                                       QString(),
+                                                                       firstFreeSector,
+                                                                       lastSector,
+                                                                       KPM_PARTITION_FLAG( None ) );
+            core->createPartition( dev, biosPartition, KPM_PARTITION_FLAG( BiosGrub ) );
+            firstFreeSector = lastSector + 1;
+        }
     }
 
     const bool mayCreateSwap
@@ -152,7 +178,7 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
     const quint64 sectorSize = quint64( dev->logicalSize() );
     if ( mayCreateSwap )
     {
-        quint64 availableSpaceB = quint64( dev->totalLogical() - firstFreeSector ) * sectorSize;
+        quint64 availableSpaceB = quint64( lastUsableSector - firstFreeSector + 1 ) * sectorSize;
         suggestedSwapSizeB = swapSuggestion( availableSpaceB, o.swap );
         // Space required by this installation is what the distro claims is needed
         // (via global configuration) plus the swap size plus a fudge factor of
@@ -163,7 +189,7 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
         shouldCreateSwap = availableSpaceB > requiredSpaceB;
     }
 
-    qint64 lastSectorForRoot = dev->totalLogical() - 1;  //last sector of the device
+    qint64 lastSectorForRoot = lastUsableSector;
     if ( shouldCreateSwap )
     {
         lastSectorForRoot -= suggestedSwapSizeB / sectorSize + 1;
@@ -182,7 +208,7 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
                                                             FileSystem::LinuxSwap,
                                                             QStringLiteral( "swap" ),
                                                             lastSectorForRoot + 1,
-                                                            dev->totalLogical() - 1,
+                                                            lastUsableSector,
                                                             KPM_PARTITION_FLAG( None ) );
         }
         else
@@ -193,7 +219,7 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
                                                                      FileSystem::LinuxSwap,
                                                                      QStringLiteral( "swap" ),
                                                                      lastSectorForRoot + 1,
-                                                                     dev->totalLogical() - 1,
+                                                                     lastUsableSector,
                                                                      o.luksFsType,
                                                                      o.luksPassphrase,
                                                                      KPM_PARTITION_FLAG( None ) );

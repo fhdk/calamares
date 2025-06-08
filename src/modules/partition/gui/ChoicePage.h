@@ -136,6 +136,7 @@ private:
     // Translations support
     void updateSwapChoicesTr();
     void updateChoiceButtonsTr();
+    void updateActionDescriptionsTr();
 
     Config* m_config;
     bool m_nextEnabled;
@@ -168,8 +169,11 @@ private:
     QPointer< QComboBox > m_efiComboBox;
 
     int m_lastSelectedDeviceIndex = -1;
+    int m_osproberEntriesCount = -1;
+    QString m_osproberOneEntryName;
 
     bool m_enableEncryptionWidget = false;
+    bool m_preCheckActivated = false;
 
     QMutex m_coreMutex;
 };
